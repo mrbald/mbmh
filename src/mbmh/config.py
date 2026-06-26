@@ -23,6 +23,9 @@ class ValidatorConfig:
     # The "issues project" the backend will query; also the default project
     # for bare `#N` ticket refs.
     issues_project: str
+    # Branch the release branches fork from; the merge-base for commit walks.
+    # Override if your default branch is not "main".
+    base_branch: str = "main"
     ticket_regex: str = DEFAULT_TICKET_REGEX
     ready_label: str = DEFAULT_READY_LABEL
     include_merges: bool = False

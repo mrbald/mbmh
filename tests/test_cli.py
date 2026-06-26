@@ -70,3 +70,35 @@ def test_cli_missing_token_and_no_fixture_dir_errors_out(tmp_path: Path) -> None
     )
     assert result.exit_code == 2
     assert "GITLAB_API_TOKEN" in result.stderr or "GITLAB_API_TOKEN" in result.stdout
+
+
+def test_cli_explicit_base_branch_main(
+    fixture_repo: Path,
+    fixture_api_dir: Path,
+    fixture_metadata: dict[str, Any],
+    tmp_path: Path,
+) -> None:
+    """--base-branch is accepted and threaded; explicit 'main' matches the default."""
+    runner = CliRunner()
+    out = tmp_path / "report.md"
+    result = runner.invoke(
+        app,
+        [
+            "--repo",
+            str(fixture_repo),
+            "--release-branch",
+            fixture_metadata["release_branch"],
+            "--milestone",
+            fixture_metadata["milestone_name"],
+            "--issues-project",
+            "acme/widgets",
+            "--base-branch",
+            "main",
+            "--fixture-dir",
+            str(fixture_api_dir),
+            "--output",
+            str(out),
+        ],
+    )
+    assert result.exit_code == 1
+    assert "# Release scope report" in out.read_text()

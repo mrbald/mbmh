@@ -1,19 +1,21 @@
 """GitLab implementation of `IssueTrackerBackend`.
 
 Two constructors:
-  - `from_token(...)` — live GitLab API (not yet wired; use `from_fixture_dir`).
-  - `from_fixture_dir(...)` — reads recorded JSON responses from a directory.
+  - `from_fixture_dir(...)` — reads recorded JSON responses from a directory
+    (offline; for tests and CI without a token).
+  - `from_token(...)` — queries the live GitLab REST API with a personal or CI
+    job token.
 
 GitLab JSON shape (relevant subset):
+
+  Milestone resolution by name: GET /projects/:id/milestones?title=...
+    [{"id": 123, "iid": 4, "title": "1.4.0"}, ...]
 
   Milestone issues:    GET /projects/:id/milestones/:id/issues
     [{"iid": 7, "title": "...", "labels": ["Ready for Release"], "web_url": "..."}, ...]
 
   Single issue:        GET /projects/:id/issues/:iid
     {"iid": 7, "title": "...", "labels": [...], "web_url": "..."}
-
-  Milestone resolution by name: GET /projects/:id/milestones?title=...
-    [{"id": 123, "iid": 4, "title": "1.4.0"}, ...]
 
 The fixture layout mirrors this:
   <dir>/milestones.json              # list of milestones
@@ -27,25 +29,41 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
+
+import httpx
 
 from mbmh.config import DEFAULT_READY_LABEL
 from mbmh.models import Ticket, TicketRef
+
+
+def _next_link(link_header: str) -> str | None:
+    """Return the `rel="next"` URL from a GitLab `Link` header, or None."""
+    for part in link_header.split(","):
+        segments = part.split(";")
+        url = segments[0].strip().strip("<>")
+        if any(seg.strip() == 'rel="next"' for seg in segments[1:]):
+            return url
+    return None
 
 
 @dataclass
 class GitLabBackend:
     """GitLab issue-tracker backend.
 
-    Concrete class (not the Protocol). Structural typing makes any instance
-    of this class satisfy `IssueTrackerBackend`.
+    Concrete class (not the Protocol); structural typing makes any instance
+    satisfy `IssueTrackerBackend`. It runs in one of two modes: fixture (data
+    loaded from disk) or live (HTTP through an `httpx.Client`).
     """
 
     issues_project: str
     ready_label: str = DEFAULT_READY_LABEL
-    # When loaded from fixture: maps milestone-name-or-id -> issues JSON list
+    # Fixture mode: milestone-name-or-id -> issues JSON list.
     _milestones: dict[str, list[dict[str, Any]]] | None = None
-    # Maps (project, iid) -> single-issue JSON (for `fetch_ticket`)
+    # Fixture mode: (project, iid) -> single-issue JSON (for `fetch_ticket`).
     _issues: dict[tuple[str, int], dict[str, Any]] | None = None
+    # Live mode: an httpx client carrying base_url + auth header.
+    _client: httpx.Client | None = None
     _marker: str = "live-api"
 
     @classmethod
@@ -106,14 +124,28 @@ class GitLabBackend:
         token: str,
         issues_project: str,
         ready_label: str = DEFAULT_READY_LABEL,
+        client: httpx.Client | None = None,
     ) -> GitLabBackend:
-        # Live API path: kept as a stub on purpose. The validator core,
-        # the report renderer, and the fixture path all work; wire this
-        # up when a live run is needed.
-        _ = (base_url, token)
-        raise NotImplementedError(
-            "Live GitLab API not wired in this release. Use from_fixture_dir() "
-            "or implement here. See docstring for endpoints."
+        """Connect to the live GitLab REST API.
+
+        `token` needs at least `read_api` scope on `issues_project`. Pass a
+        pre-built `client` (e.g. one with a mock transport) for testing;
+        otherwise one is built from `base_url` + `token`.
+        """
+        http = (
+            client
+            if client is not None
+            else httpx.Client(
+                base_url=base_url.rstrip("/"),
+                headers={"PRIVATE-TOKEN": token, "Accept": "application/json"},
+                timeout=httpx.Timeout(30.0),
+            )
+        )
+        return cls(
+            issues_project=issues_project,
+            ready_label=ready_label,
+            _client=http,
+            _marker="live-api",
         )
 
     # ----- IssueTrackerBackend protocol surface -----
@@ -123,6 +155,8 @@ class GitLabBackend:
         return self._marker
 
     def fetch_milestone_tickets(self, milestone: str) -> list[Ticket]:
+        if self._client is not None:
+            return self._live_milestone_tickets(milestone)
         if self._milestones is None:
             raise RuntimeError("backend not loaded; use from_fixture_dir or from_token")
         if milestone not in self._milestones:
@@ -130,6 +164,8 @@ class GitLabBackend:
         return [self._to_ticket(raw) for raw in self._milestones[milestone]]
 
     def fetch_ticket(self, ref: TicketRef) -> Ticket | None:
+        if self._client is not None:
+            return self._live_fetch_ticket(ref)
         if self._issues is None:
             raise RuntimeError("backend not loaded; use from_fixture_dir or from_token")
         raw = self._issues.get((ref.project, ref.issue))
@@ -137,7 +173,51 @@ class GitLabBackend:
             return None
         return self._to_ticket(raw, ref=ref)
 
-    # ----- helpers -----
+    def close(self) -> None:
+        """Close the live HTTP client, if any. A no-op in fixture mode."""
+        if self._client is not None:
+            self._client.close()
+
+    # ----- live API internals -----
+
+    def _paginate(
+        self, path: str, params: dict[str, str | int] | None = None
+    ) -> list[dict[str, Any]]:
+        """GET `path` and follow GitLab `Link: rel="next"` pages."""
+        assert self._client is not None
+        out: list[dict[str, Any]] = []
+        resp = self._client.get(path, params=params)
+        while True:
+            resp.raise_for_status()
+            page: list[dict[str, Any]] = resp.json()
+            out.extend(page)
+            next_url = _next_link(resp.headers.get("link", ""))
+            if not next_url:
+                return out
+            resp = self._client.get(next_url)
+
+    def _live_milestone_tickets(self, milestone: str) -> list[Ticket]:
+        enc = quote(self.issues_project, safe="")
+        found = self._paginate(f"/api/v4/projects/{enc}/milestones", {"title": milestone})
+        if not found:
+            raise KeyError(f"unknown milestone: {milestone}")
+        milestone_id = int(found[0]["id"])
+        issues = self._paginate(
+            f"/api/v4/projects/{enc}/milestones/{milestone_id}/issues",
+            {"per_page": 100},
+        )
+        return [self._to_ticket(raw) for raw in issues]
+
+    def _live_fetch_ticket(self, ref: TicketRef) -> Ticket | None:
+        assert self._client is not None
+        enc = quote(ref.project, safe="")
+        resp = self._client.get(f"/api/v4/projects/{enc}/issues/{ref.issue}")
+        if resp.status_code == 404:
+            return None
+        resp.raise_for_status()
+        return self._to_ticket(resp.json(), ref=ref)
+
+    # ----- shared helpers -----
 
     def _to_ticket(self, raw: dict[str, Any], *, ref: TicketRef | None = None) -> Ticket:
         project = raw.get("project_path") or self.issues_project

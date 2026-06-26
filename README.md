@@ -52,8 +52,20 @@ Exit codes: `0` clean · `1` error-severity findings present · `2` bad config.
 Other options: `--ready-label` (default `Ready for Release`), `--ticket-regex`,
 `--include-merges`, `--output`/`-o`.
 
-> **Live GitLab API is not wired in v0.1** — use `--fixture-dir`. Live access
-> (via a `GITLAB_API_TOKEN`) lands next; see [CHANGELOG.md](CHANGELOG.md).
+Against a live GitLab instance, set a token instead of passing `--fixture-dir`:
+
+```sh
+export GITLAB_API_TOKEN=glpat-xxxxxxxxxxxxxxxxxxxx
+# self-hosted? also set: export GITLAB_BASE_URL=https://gitlab.example.com
+mbmh \
+  --repo /path/to/repo \
+  --release-branch release/1.4.0 \
+  --milestone 1.4.0 \
+  --issues-project mygroup/myproject
+```
+
+The token needs `read_api` scope on the issues project. Pass `--base-branch`
+if your default branch is not `main`.
 
 ## Fixture layout
 
@@ -72,10 +84,9 @@ fixtures/
 
 `mbmh` is meant to grow into a set of engineering-hygiene checks. Next up:
 
-- Live GitLab API backend (personal or CI job token).
-- Configurable base branch, instead of assuming `main`.
 - Ticket-structure rules: parent **EPIC** state (`Ready for Release` for done
   work, `In Progress` at commit time) and minimum-quality descriptions.
+- More trackers (GitHub Issues, Jira) behind the same `IssueTrackerBackend`.
 
 ## Add a backend
 

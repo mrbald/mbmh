@@ -30,6 +30,7 @@ def validate(
     current_commits = list_commits(
         repo_path=config.repo_path,
         release_branch=config.release_branch,
+        base_ref=config.base_branch,
         ticket_regex=config.ticket_regex,
         default_project=config.issues_project,
         include_merges=config.include_merges,
@@ -55,6 +56,7 @@ def validate(
         previous_commits = list_commits(
             repo_path=config.repo_path,
             release_branch=config.previous_branch,
+            base_ref=config.base_branch,
             ticket_regex=config.ticket_regex,
             default_project=config.issues_project,
             include_merges=config.include_merges,

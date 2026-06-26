@@ -43,6 +43,9 @@ def run(
     previous_branch: Annotated[
         str | None, typer.Option(help="Previous release branch (optional).")
     ] = None,
+    base_branch: Annotated[
+        str, typer.Option(help="Branch the release forks from (merge-base for commit walks).")
+    ] = "main",
     ticket_regex: Annotated[
         str, typer.Option(help="Ticket extraction regex.")
     ] = DEFAULT_TICKET_REGEX,
@@ -74,6 +77,7 @@ def run(
         previous_branch=previous_branch,
         milestone=milestone,
         issues_project=issues_project,
+        base_branch=base_branch,
         ticket_regex=ticket_regex,
         ready_label=ready_label,
         include_merges=include_merges,
@@ -101,7 +105,10 @@ def run(
             ready_label=ready_label,
         )
 
-    result = validate(config, backend)
+    try:
+        result = validate(config, backend)
+    finally:
+        backend.close()
     report = render_report(result)
 
     if output is not None:
