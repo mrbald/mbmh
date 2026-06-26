@@ -1,0 +1,170 @@
+"""Git porcelain wrappers and parsing.
+
+All operations are local — we never network out. The caller is expected
+to have already fetched both release branches into the working tree.
+"""
+
+from __future__ import annotations
+
+import re
+import subprocess
+from dataclasses import dataclass
+from pathlib import Path
+
+from mbmh.models import Commit, TicketRef
+
+# Match a "Change-Id: I<hex>" trailer Gerrit-style.
+_CHANGE_ID_RE = re.compile(r"^Change-Id:\s*(I[0-9a-fA-F]+)\s*$", re.MULTILINE)
+
+
+@dataclass(frozen=True)
+class GitError(Exception):
+    """Raised when a git command fails or returns unexpected output."""
+
+    message: str
+
+    def __str__(self) -> str:  # pragma: no cover - trivial
+        return self.message
+
+
+def _run_git(repo: Path, *args: str) -> str:
+    """Run a git command and return stdout, raising GitError on failure."""
+    result = subprocess.run(
+        ["git", "-C", str(repo), *args],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise GitError(message=f"git {' '.join(args)} failed: {result.stderr.strip()}")
+    return result.stdout
+
+
+def merge_base(repo: Path, a: str, b: str) -> str:
+    out = _run_git(repo, "merge-base", a, b).strip()
+    if not out:
+        raise GitError(message=f"no merge-base between {a} and {b}")
+    return out
+
+
+def _commit_subject_and_body(repo: Path, sha: str) -> tuple[str, str]:
+    # %B is the raw body including subject.
+    body = _run_git(repo, "show", "-s", "--format=%B", sha)
+    body = body.rstrip("\n")
+    first_nl = body.find("\n")
+    if first_nl == -1:
+        return body, body
+    return body[:first_nl], body
+
+
+def _is_merge(repo: Path, sha: str) -> bool:
+    parents = _run_git(repo, "rev-list", "--parents", "-n", "1", sha).strip().split()
+    # First field is the commit itself; remaining are parents.
+    return len(parents) > 2
+
+
+def _patch_id(repo: Path, sha: str) -> str | None:
+    """Return git patch-id --stable for a commit, or None for empty diff."""
+    diff = _run_git(repo, "show", "--patch", "--no-color", sha)
+    if not diff.strip():
+        return None
+    result = subprocess.run(
+        ["git", "-C", str(repo), "patch-id", "--stable"],
+        input=diff,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return None
+    line = result.stdout.strip()
+    if not line:
+        return None
+    return line.split()[0]
+
+
+def _extract_change_id(message: str) -> str | None:
+    m = _CHANGE_ID_RE.search(message)
+    return m.group(1) if m else None
+
+
+def extract_ticket_refs(
+    message: str,
+    *,
+    regex: str,
+    default_project: str,
+) -> tuple[TicketRef, ...]:
+    """Extract all ticket references from a commit message.
+
+    Bare `#N` resolves to `default_project`. Order-preserving, deduplicated.
+    """
+    compiled = re.compile(regex)
+    seen: set[tuple[str, int]] = set()
+    out: list[TicketRef] = []
+    for m in compiled.finditer(message):
+        proj_raw = m.groupdict().get("project")
+        proj = (proj_raw or default_project).strip()
+        iid = int(m.group("issue"))
+        key = (proj, iid)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(TicketRef(project=proj, issue=iid))
+    return tuple(out)
+
+
+def list_commits(
+    *,
+    repo_path: str | Path,
+    release_branch: str,
+    base_ref: str = "main",
+    ticket_regex: str,
+    default_project: str,
+    include_merges: bool = False,
+) -> list[Commit]:
+    """List commits on `release_branch` since its merge-base with `base_ref`.
+
+    By default walks `--first-parent` and skips merge commits per the spec.
+    """
+    repo = Path(repo_path)
+    base = merge_base(repo, release_branch, base_ref)
+    args = ["rev-list", "--reverse"]
+    if not include_merges:
+        args += ["--first-parent", "--no-merges"]
+    args += [f"{base}..{release_branch}"]
+    raw = _run_git(repo, *args)
+    shas = [line.strip() for line in raw.splitlines() if line.strip()]
+
+    out: list[Commit] = []
+    for sha in shas:
+        subject, message = _commit_subject_and_body(repo, sha)
+        is_merge = _is_merge(repo, sha)
+        if is_merge and not include_merges:
+            continue
+        out.append(
+            Commit(
+                sha=sha,
+                subject=subject,
+                message=message,
+                is_merge=is_merge,
+                patch_id=_patch_id(repo, sha),
+                change_id=_extract_change_id(message),
+                ticket_refs=extract_ticket_refs(
+                    message,
+                    regex=ticket_regex,
+                    default_project=default_project,
+                ),
+            )
+        )
+    return out
+
+
+def patch_equivalence_set(commits: list[Commit]) -> tuple[set[str], set[str]]:
+    """Return (change_ids, patch_ids) seen across the given commit list.
+
+    Empty/None values are ignored. Used to detect when a previous-branch
+    commit is patch-equivalent to a current-branch commit (back-port).
+    """
+    change_ids = {c.change_id for c in commits if c.change_id}
+    patch_ids = {c.patch_id for c in commits if c.patch_id}
+    return change_ids, patch_ids

@@ -1,0 +1,68 @@
+[project]
+name = "mbmh"
+description = "Messy bed — messy head! Hygiene checks for your engineering process — v0.1 validates a release branch against its milestone."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "AGPL-3.0-or-later"
+license-files = ["LICENSE"]
+authors = [{ name = "mrbald", email = "lysyy@me.com" }]
+keywords = ["release", "scope", "validation", "gitlab", "milestone", "ci", "hygiene", "governance"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Software Development :: Version Control :: Git",
+]
+dynamic = ["version"]
+dependencies = [
+    "typer>=0.15",
+]
+
+[project.scripts]
+mbmh = "mbmh.cli:app"
+
+[project.urls]
+Homepage = "https://github.com/mrbald/mbmh"
+Repository = "https://github.com/mrbald/mbmh"
+Issues = "https://github.com/mrbald/mbmh/issues"
+Changelog = "https://github.com/mrbald/mbmh/blob/main/CHANGELOG.md"
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "pyright>=1.1.392",
+    "ruff>=0.7",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.version]
+path = "src/mbmh/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mbmh"]
+
+[tool.pyright]
+include = ["src", "tests"]
+pythonVersion = "3.12"
+typeCheckingMode = "strict"
+reportMissingTypeStubs = false
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "C4"]
+ignore = []
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
