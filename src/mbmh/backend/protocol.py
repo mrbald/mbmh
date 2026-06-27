@@ -33,3 +33,7 @@ class IssueTrackerBackend(Protocol):
     def marker(self) -> str:
         """Free-form short string for the report footer (e.g. 'fixture'/'live-api')."""
         ...
+
+    def close(self) -> None:
+        """Release any resources (e.g. an HTTP client). A no-op for fixtures."""
+        ...

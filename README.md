@@ -26,7 +26,7 @@ of a planned family of process-hygiene checks.
 | `ambiguous-equivalence` | warning | a previous-branch commit has no fingerprint to match on |
 
 The validator core is **vendor-free** — it talks to an `IssueTrackerBackend`
-protocol, so GitLab is the first backend, not the only possible one.
+protocol. **GitLab** and **GitHub** are supported today; more can be added.
 
 ## Install
 
@@ -71,6 +71,21 @@ mbmh \
 
 The token needs `read_api` scope on the issues project.
 
+### GitHub
+
+Use `--tracker github` with a `GITHUB_TOKEN`; `--issues-project` is `owner/repo`:
+
+```sh
+export GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
+# GitHub Enterprise? also set: export GITHUB_API_URL=https://ghe.example.com/api/v3
+mbmh \
+  --tracker github \
+  --repo /path/to/repo \
+  --to v1.4.0 --from v1.3.0 \
+  --milestone 1.4.0 \
+  --issues-project myorg/myrepo
+```
+
 ### Compare two points
 
 `--from` and `--to` take any ref — branch, tag, or commit — so you can diff two
@@ -98,7 +113,7 @@ fixtures/
 
 - Ticket-structure rules: parent **EPIC** state (`Ready for Release` for done
   work, `In Progress` at commit time) and minimum-quality descriptions.
-- More trackers (GitHub Issues, Jira) behind the same `IssueTrackerBackend`.
+- More trackers (e.g. Jira) behind the same `IssueTrackerBackend`.
 
 ## Add a backend
 

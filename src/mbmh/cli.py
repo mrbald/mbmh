@@ -12,11 +12,14 @@ from __future__ import annotations
 
 import os
 import sys
+from enum import StrEnum
 from pathlib import Path
 from typing import Annotated
 
 import typer
 
+from mbmh.backend import IssueTrackerBackend
+from mbmh.backend.github import GitHubBackend
 from mbmh.backend.gitlab import GitLabBackend
 from mbmh.config import (
     DEFAULT_READY_LABEL,
@@ -32,6 +35,45 @@ app = typer.Typer(
 )
 
 
+class Tracker(StrEnum):
+    gitlab = "gitlab"
+    github = "github"
+
+
+def _resolve_backend(
+    tracker: Tracker,
+    fixture_dir: Path | None,
+    issues_project: str,
+    ready_label: str,
+) -> IssueTrackerBackend:
+    """Build the chosen backend in fixture mode or live (token) mode."""
+    if tracker is Tracker.github:
+        if fixture_dir is not None:
+            return GitHubBackend.from_fixture_dir(
+                fixture_dir, issues_project=issues_project, ready_label=ready_label
+            )
+        token = os.environ.get("GITHUB_TOKEN")
+        if not token:
+            typer.echo("GITHUB_TOKEN not set and no --fixture-dir provided.", err=True)
+            raise typer.Exit(code=2)
+        base_url = os.environ.get("GITHUB_API_URL", "https://api.github.com")
+        return GitHubBackend.from_token(
+            base_url=base_url, token=token, issues_project=issues_project, ready_label=ready_label
+        )
+    if fixture_dir is not None:
+        return GitLabBackend.from_fixture_dir(
+            fixture_dir, issues_project=issues_project, ready_label=ready_label
+        )
+    token = os.environ.get("GITLAB_API_TOKEN")
+    if not token:
+        typer.echo("GITLAB_API_TOKEN not set and no --fixture-dir provided.", err=True)
+        raise typer.Exit(code=2)
+    base_url = os.environ.get("GITLAB_BASE_URL", "https://gitlab.com")
+    return GitLabBackend.from_token(
+        base_url=base_url, token=token, issues_project=issues_project, ready_label=ready_label
+    )
+
+
 @app.command()
 def run(
     repo: Annotated[Path, typer.Option(help="Path to the local git working tree.")],
@@ -43,8 +85,10 @@ def run(
     ],
     milestone: Annotated[str, typer.Option(help="Milestone name (or ID).")],
     issues_project: Annotated[
-        str, typer.Option(help="GitLab issues project (path or numeric ID).")
+        str,
+        typer.Option(help="Issues project — GitLab path/ID, or GitHub 'owner/repo'."),
     ],
+    tracker: Annotated[Tracker, typer.Option(help="Issue tracker backend.")] = Tracker.gitlab,
     previous_branch: Annotated[
         str | None,
         typer.Option(
@@ -98,27 +142,7 @@ def run(
         include_merges=include_merges,
     )
 
-    if fixture_dir is not None:
-        backend = GitLabBackend.from_fixture_dir(
-            fixture_dir,
-            issues_project=issues_project,
-            ready_label=ready_label,
-        )
-    else:
-        token = os.environ.get("GITLAB_API_TOKEN")
-        if not token:
-            typer.echo(
-                "GITLAB_API_TOKEN not set and no --fixture-dir provided.",
-                err=True,
-            )
-            raise typer.Exit(code=2)
-        base_url = os.environ.get("GITLAB_BASE_URL", "https://gitlab.com")
-        backend = GitLabBackend.from_token(
-            base_url=base_url,
-            token=token,
-            issues_project=issues_project,
-            ready_label=ready_label,
-        )
+    backend = _resolve_backend(tracker, fixture_dir, issues_project, ready_label)
 
     try:
         result = validate(config, backend)

@@ -7,6 +7,8 @@ All notable changes are recorded here. The format follows
 ## [Unreleased]
 
 ### Added
+- GitHub Issues backend (`--tracker github`, `GITHUB_TOKEN`) in live and
+  fixture modes, alongside GitLab.
 - Diff any two refs — branch, tag, or commit — via `--from` / `--to`
   (`--base-branch` / `--release-branch` kept as aliases).
 - Revert handling: an apply+revert pair (default `git revert` message) cancels
@@ -15,7 +17,7 @@ All notable changes are recorded here. The format follows
 ### Planned
 - Ticket-structure rules: parent EPIC state (`Ready for Release` for done work,
   `In Progress` at commit time) and minimum-quality descriptions.
-- More trackers (GitHub Issues, Jira) behind the `IssueTrackerBackend` protocol.
+- More trackers (e.g. Jira) behind the `IssueTrackerBackend` protocol.
 
 ## [0.1.0] — 2026-06-27
 

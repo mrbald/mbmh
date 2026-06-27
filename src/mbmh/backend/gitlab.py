@@ -33,18 +33,9 @@ from urllib.parse import quote
 
 import httpx
 
+from mbmh.backend._http import paginate
 from mbmh.config import DEFAULT_READY_LABEL
 from mbmh.models import Ticket, TicketRef
-
-
-def _next_link(link_header: str) -> str | None:
-    """Return the `rel="next"` URL from a GitLab `Link` header, or None."""
-    for part in link_header.split(","):
-        segments = part.split(";")
-        url = segments[0].strip().strip("<>")
-        if any(seg.strip() == 'rel="next"' for seg in segments[1:]):
-            return url
-    return None
 
 
 @dataclass
@@ -180,29 +171,15 @@ class GitLabBackend:
 
     # ----- live API internals -----
 
-    def _paginate(
-        self, path: str, params: dict[str, str | int] | None = None
-    ) -> list[dict[str, Any]]:
-        """GET `path` and follow GitLab `Link: rel="next"` pages."""
-        assert self._client is not None
-        out: list[dict[str, Any]] = []
-        resp = self._client.get(path, params=params)
-        while True:
-            resp.raise_for_status()
-            page: list[dict[str, Any]] = resp.json()
-            out.extend(page)
-            next_url = _next_link(resp.headers.get("link", ""))
-            if not next_url:
-                return out
-            resp = self._client.get(next_url)
-
     def _live_milestone_tickets(self, milestone: str) -> list[Ticket]:
+        assert self._client is not None
         enc = quote(self.issues_project, safe="")
-        found = self._paginate(f"/api/v4/projects/{enc}/milestones", {"title": milestone})
+        found = paginate(self._client, f"/api/v4/projects/{enc}/milestones", {"title": milestone})
         if not found:
             raise KeyError(f"unknown milestone: {milestone}")
         milestone_id = int(found[0]["id"])
-        issues = self._paginate(
+        issues = paginate(
+            self._client,
             f"/api/v4/projects/{enc}/milestones/{milestone_id}/issues",
             {"per_page": 100},
         )
