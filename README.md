@@ -115,3 +115,8 @@ uv run pytest
 uv run ruff check && uv run ruff format --check
 uv run pyright
 ```
+
+---
+
+_Most of the code is written with the assistance of industrial coding agents —
+primarily Anthropic's Claude — while the original ideas and design are my own._
