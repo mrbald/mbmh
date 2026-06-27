@@ -7,6 +7,9 @@ All notable changes are recorded here. The format follows
 ## [Unreleased]
 
 ### Added
+- Local `todo.txt` backend (`--tracker local`): tickets in a plain text file in
+  your repo, fully offline — no token, no network. Each task is a ticket
+  (`id:`, `milestone:`, `@ready`).
 - GitHub Issues backend (`--tracker github`, `GITHUB_TOKEN`) in live and
   fixture modes, alongside GitLab.
 - Diff any two refs — branch, tag, or commit — via `--from` / `--to`

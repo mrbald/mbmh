@@ -21,6 +21,7 @@ import typer
 from mbmh.backend import IssueTrackerBackend
 from mbmh.backend.github import GitHubBackend
 from mbmh.backend.gitlab import GitLabBackend
+from mbmh.backend.local import LocalBackend
 from mbmh.config import (
     DEFAULT_READY_LABEL,
     DEFAULT_TICKET_REGEX,
@@ -38,6 +39,7 @@ app = typer.Typer(
 class Tracker(StrEnum):
     gitlab = "gitlab"
     github = "github"
+    local = "local"
 
 
 def _resolve_backend(
@@ -45,8 +47,16 @@ def _resolve_backend(
     fixture_dir: Path | None,
     issues_project: str,
     ready_label: str,
+    repo: Path,
+    todo_file: Path | None,
 ) -> IssueTrackerBackend:
     """Build the chosen backend in fixture mode or live (token) mode."""
+    if tracker is Tracker.local:
+        path = todo_file if todo_file is not None else repo / "todo.txt"
+        if not path.exists():
+            typer.echo(f"todo file not found: {path}", err=True)
+            raise typer.Exit(code=2)
+        return LocalBackend.from_file(path, issues_project=issues_project, ready_label=ready_label)
     if tracker is Tracker.github:
         if fixture_dir is not None:
             return GitHubBackend.from_fixture_dir(
@@ -121,6 +131,13 @@ def run(
     fixture_dir: Annotated[
         Path | None, typer.Option(help="Use recorded JSON fixtures from this directory.")
     ] = None,
+    todo_file: Annotated[
+        Path | None,
+        typer.Option(
+            "--todo-file",
+            help="Path to a todo.txt for --tracker local (default: <repo>/todo.txt).",
+        ),
+    ] = None,
     output: Annotated[
         Path | None,
         typer.Option("--output", "-o", help="Write the report to this file (default: stdout)."),
@@ -142,7 +159,7 @@ def run(
         include_merges=include_merges,
     )
 
-    backend = _resolve_backend(tracker, fixture_dir, issues_project, ready_label)
+    backend = _resolve_backend(tracker, fixture_dir, issues_project, ready_label, repo, todo_file)
 
     try:
         result = validate(config, backend)

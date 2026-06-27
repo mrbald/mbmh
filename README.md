@@ -26,7 +26,8 @@ of a planned family of process-hygiene checks.
 | `ambiguous-equivalence` | warning | a previous-branch commit has no fingerprint to match on |
 
 The validator core is **vendor-free** — it talks to an `IssueTrackerBackend`
-protocol. **GitLab** and **GitHub** are supported today; more can be added.
+protocol. **GitLab**, **GitHub**, and a local **`todo.txt`** are supported
+today; more can be added.
 
 ## Install
 
@@ -84,6 +85,27 @@ mbmh \
   --to v1.4.0 --from v1.3.0 \
   --milestone 1.4.0 \
   --issues-project myorg/myrepo
+```
+
+### Local (todo.txt)
+
+No tracker at all — keep tickets in a `todo.txt` in your repo, fully offline.
+`--tracker local` reads `<repo>/todo.txt` (or `--todo-file PATH`); each task
+line is a ticket:
+
+```text
+Fix login redirect loop id:42 milestone:1.4.0 @ready
+Add signup form id:43 milestone:1.4.0
+```
+
+`id:N` is the issue number (cite it from commits as `#42`), `milestone:M` groups
+by release, and the `@ready` context marks it ready for release. Lines without
+an `id:` are ignored.
+
+```sh
+mbmh --tracker local \
+  --repo . --to v1.4.0 --from v1.3.0 \
+  --milestone 1.4.0 --issues-project myrepo --ready-label ready
 ```
 
 ### Compare two points
