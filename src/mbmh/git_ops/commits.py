@@ -187,8 +187,17 @@ def _resolve_sha(ref: str, by_sha: dict[str, Commit]) -> str | None:
     return matches[0] if len(matches) == 1 else None
 
 
-def collapse_reverts(commits: list[Commit]) -> list[Commit]:
-    """Drop apply+revert pairs from a commit list.
+@dataclass(frozen=True)
+class RevertCollapse:
+    """Result of collapsing reverts: surviving commits + the cancelled pairs."""
+
+    kept: list[Commit]
+    # (revert_commit, reverted_target) pairs that cancelled out
+    pairs: list[tuple[Commit, Commit]]
+
+
+def collapse_reverts_detailed(commits: list[Commit]) -> RevertCollapse:
+    """Collapse apply+revert pairs; return survivors and the cancelled pairs.
 
     A commit carrying the default `This reverts commit <sha>.` message cancels
     the commit it names, when that commit is also in the list: both are removed,
@@ -199,6 +208,7 @@ def collapse_reverts(commits: list[Commit]) -> list[Commit]:
     """
     by_sha = {c.sha: c for c in commits}
     cancelled: set[str] = set()
+    pairs: list[tuple[Commit, Commit]] = []
     for c in commits:
         if c.reverts is None or c.sha in cancelled:
             continue
@@ -206,4 +216,11 @@ def collapse_reverts(commits: list[Commit]) -> list[Commit]:
         if target is not None and target not in cancelled:
             cancelled.add(c.sha)
             cancelled.add(target)
-    return [c for c in commits if c.sha not in cancelled]
+            pairs.append((c, by_sha[target]))
+    kept = [c for c in commits if c.sha not in cancelled]
+    return RevertCollapse(kept=kept, pairs=pairs)
+
+
+def collapse_reverts(commits: list[Commit]) -> list[Commit]:
+    """Return only the commits that survive `collapse_reverts_detailed`."""
+    return collapse_reverts_detailed(commits).kept

@@ -102,6 +102,8 @@ class ValidationResult:
     # commits that are on previous-branch and have no patch-equivalent on current
     dropped_previous_commits: list[Commit] = field(default_factory=list[Commit])
     fixture_marker: str = "live-api"
+    # (revert_commit, reverted_target) pairs cancelled out of the scope
+    reverted_pairs: list[tuple[Commit, Commit]] = field(default_factory=list[tuple[Commit, Commit]])
 
     @property
     def has_errors(self) -> bool:

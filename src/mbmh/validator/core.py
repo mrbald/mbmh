@@ -10,7 +10,12 @@ from __future__ import annotations
 
 from mbmh.backend import IssueTrackerBackend
 from mbmh.config import ValidatorConfig
-from mbmh.git_ops import collapse_reverts, list_commits, patch_equivalence_set
+from mbmh.git_ops import (
+    collapse_reverts,
+    collapse_reverts_detailed,
+    list_commits,
+    patch_equivalence_set,
+)
 from mbmh.models import (
     Commit,
     ErrorCategory,
@@ -27,7 +32,7 @@ def validate(
 ) -> ValidationResult:
     """Run all checks. Returns the populated ValidationResult."""
 
-    current_commits = collapse_reverts(
+    current = collapse_reverts_detailed(
         list_commits(
             repo_path=config.repo_path,
             release_branch=config.release_branch,
@@ -37,6 +42,7 @@ def validate(
             include_merges=config.include_merges,
         )
     )
+    current_commits = current.kept
 
     milestone_tickets = backend.fetch_milestone_tickets(config.milestone)
     milestone_refs: dict[TicketRef, Ticket] = {t.ref: t for t in milestone_tickets}
@@ -49,6 +55,7 @@ def validate(
         commits=current_commits,
         milestone_tickets=list(milestone_tickets),
         fixture_marker=backend.marker,
+        reverted_pairs=current.pairs,
     )
 
     _check_per_commit(result, current_commits, milestone_refs, backend)

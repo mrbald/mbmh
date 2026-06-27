@@ -43,6 +43,11 @@ def _header(result: ValidationResult) -> str:
     if result.previous_branch is not None:
         lines.append(f"- Previous branch: `{result.previous_branch}`")
     lines.append(f"- Commits inspected: **{len(result.commits)}**")
+    if result.reverted_pairs:
+        lines.append(
+            f"- Reverts collapsed: **{len(result.reverted_pairs)}** "
+            "apply+revert pair(s) excluded from scope"
+        )
     lines.append(f"- Milestone tickets: **{len(result.milestone_tickets)}**")
     if counts:
         lines.append("- Findings by category:")
@@ -184,6 +189,13 @@ def _reconciliation(result: ValidationResult) -> str:
         )
         for c in result.dropped_previous_commits:
             lines.append(f"- `{c.sha[:12]}` {c.subject}")
+    if result.reverted_pairs:
+        lines.append("")
+        lines.append(f"_Reverts collapsed_: {len(result.reverted_pairs)}")
+        for revert_c, target_c in result.reverted_pairs:
+            lines.append(
+                f"- `{target_c.sha[:12]}` {target_c.subject} — reverted by `{revert_c.sha[:12]}`"
+            )
     lines.append("")
     lines.append("</details>")
     return "\n".join(lines) + "\n"

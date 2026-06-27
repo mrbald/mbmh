@@ -7,7 +7,8 @@ import subprocess
 from pathlib import Path
 
 from mbmh.git_ops import collapse_reverts, list_commits
-from mbmh.models import Commit
+from mbmh.models import Commit, ValidationResult
+from mbmh.report import render_report
 
 REGEX = r"(?:(?P<project>[\w./-]+))?#(?P<issue>\d+)"
 
@@ -90,3 +91,18 @@ def test_real_git_revert_is_parsed_and_collapsed(tmp_path: Path) -> None:
     )
     assert any(c.reverts == feat_sha for c in commits), "default revert message should be parsed"
     assert collapse_reverts(commits) == [], "feat and its revert should cancel out"
+
+
+def test_report_shows_revert_collapse_note() -> None:
+    target = _commit_obj("a" * 40, "feat: x acme/widgets#1")
+    revert = _commit_obj("b" * 40, f"Revert x\n\nThis reverts commit {'a' * 40}.", reverts="a" * 40)
+    result = ValidationResult(
+        release_name="1.4.0",
+        milestone_name="1.4.0",
+        release_branch="release/1.4.0",
+        previous_branch=None,
+        reverted_pairs=[(revert, target)],
+    )
+    md = render_report(result)
+    assert "Reverts collapsed" in md
+    assert ("a" * 12) in md
