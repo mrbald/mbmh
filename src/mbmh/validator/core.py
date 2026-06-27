@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from mbmh.backend import IssueTrackerBackend
 from mbmh.config import ValidatorConfig
-from mbmh.git_ops import list_commits, patch_equivalence_set
+from mbmh.git_ops import collapse_reverts, list_commits, patch_equivalence_set
 from mbmh.models import (
     Commit,
     ErrorCategory,
@@ -27,13 +27,15 @@ def validate(
 ) -> ValidationResult:
     """Run all checks. Returns the populated ValidationResult."""
 
-    current_commits = list_commits(
-        repo_path=config.repo_path,
-        release_branch=config.release_branch,
-        base_ref=config.base_branch,
-        ticket_regex=config.ticket_regex,
-        default_project=config.issues_project,
-        include_merges=config.include_merges,
+    current_commits = collapse_reverts(
+        list_commits(
+            repo_path=config.repo_path,
+            release_branch=config.release_branch,
+            base_ref=config.base_branch,
+            ticket_regex=config.ticket_regex,
+            default_project=config.issues_project,
+            include_merges=config.include_merges,
+        )
     )
 
     milestone_tickets = backend.fetch_milestone_tickets(config.milestone)
@@ -53,13 +55,15 @@ def validate(
     _check_missing(result, current_commits, milestone_tickets)
 
     if config.previous_branch is not None:
-        previous_commits = list_commits(
-            repo_path=config.repo_path,
-            release_branch=config.previous_branch,
-            base_ref=config.base_branch,
-            ticket_regex=config.ticket_regex,
-            default_project=config.issues_project,
-            include_merges=config.include_merges,
+        previous_commits = collapse_reverts(
+            list_commits(
+                repo_path=config.repo_path,
+                release_branch=config.previous_branch,
+                base_ref=config.base_branch,
+                ticket_regex=config.ticket_regex,
+                default_project=config.issues_project,
+                include_merges=config.include_merges,
+            )
         )
         _check_regressions(result, current_commits, previous_commits)
 

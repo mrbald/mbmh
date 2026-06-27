@@ -69,8 +69,15 @@ mbmh \
   --issues-project mygroup/myproject
 ```
 
-The token needs `read_api` scope on the issues project. Pass `--base-branch`
-if your default branch is not `main`.
+The token needs `read_api` scope on the issues project.
+
+### Compare two points
+
+`--from` and `--to` take any ref — branch, tag, or commit — so you can diff two
+release tags on the same branch (e.g. `--from v1.3.0 --to v1.4.0`). Cherry-picked
+commits are matched by `patch-id` / `Change-Id`, and an apply-then-revert pair
+(default `git revert` message) cancels out. `--from` defaults to `main`; the old
+`--base-branch` / `--release-branch` names still work.
 
 ## Fixture layout
 

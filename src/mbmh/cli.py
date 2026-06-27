@@ -35,16 +35,31 @@ app = typer.Typer(
 @app.command()
 def run(
     repo: Annotated[Path, typer.Option(help="Path to the local git working tree.")],
-    release_branch: Annotated[str, typer.Option(help="Current release branch name.")],
+    release_branch: Annotated[
+        str,
+        typer.Option(
+            "--to", "--release-branch", help="Newer ref to validate — branch, tag, or commit."
+        ),
+    ],
     milestone: Annotated[str, typer.Option(help="Milestone name (or ID).")],
     issues_project: Annotated[
         str, typer.Option(help="GitLab issues project (path or numeric ID).")
     ],
     previous_branch: Annotated[
-        str | None, typer.Option(help="Previous release branch (optional).")
+        str | None,
+        typer.Option(
+            "--previous",
+            "--previous-branch",
+            help="Optional prior release ref for the dropped-commit check.",
+        ),
     ] = None,
     base_branch: Annotated[
-        str, typer.Option(help="Branch the release forks from (merge-base for commit walks).")
+        str,
+        typer.Option(
+            "--from",
+            "--base-branch",
+            help="Older ref to diff from — the merge-base anchor (branch, tag, or commit).",
+        ),
     ] = "main",
     ticket_regex: Annotated[
         str, typer.Option(help="Ticket extraction regex.")

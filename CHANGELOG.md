@@ -6,6 +6,12 @@ All notable changes are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+- Diff any two refs — branch, tag, or commit — via `--from` / `--to`
+  (`--base-branch` / `--release-branch` kept as aliases).
+- Revert handling: an apply+revert pair (default `git revert` message) cancels
+  out, so reverted work no longer counts as shipped.
+
 ### Planned
 - Ticket-structure rules: parent EPIC state (`Ready for Release` for done work,
   `In Progress` at commit time) and minimum-quality descriptions.

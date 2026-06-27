@@ -42,6 +42,9 @@ class Commit:
     patch_id: str | None
     change_id: str | None
     ticket_refs: tuple[TicketRef, ...]
+    # full sha this commit reverts, parsed from the default `git revert`
+    # message; None if the commit is not a recognised revert
+    reverts: str | None = None
 
 
 class ErrorCategory(StrEnum):

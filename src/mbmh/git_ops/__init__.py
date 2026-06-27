@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 from mbmh.git_ops.commits import (
+    collapse_reverts,
     extract_ticket_refs,
     list_commits,
     patch_equivalence_set,
 )
 
 __all__ = [
+    "collapse_reverts",
     "extract_ticket_refs",
     "list_commits",
     "patch_equivalence_set",

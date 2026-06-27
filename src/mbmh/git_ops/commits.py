@@ -16,6 +16,9 @@ from mbmh.models import Commit, TicketRef
 # Match a "Change-Id: I<hex>" trailer Gerrit-style.
 _CHANGE_ID_RE = re.compile(r"^Change-Id:\s*(I[0-9a-fA-F]+)\s*$", re.MULTILINE)
 
+# Match the default `git revert` body line: "This reverts commit <sha>."
+_REVERT_RE = re.compile(r"^This reverts commit ([0-9a-f]{7,40})\b", re.MULTILINE)
+
 
 @dataclass(frozen=True)
 class GitError(Exception):
@@ -88,6 +91,11 @@ def _extract_change_id(message: str) -> str | None:
     return m.group(1) if m else None
 
 
+def _extract_reverted_sha(message: str) -> str | None:
+    m = _REVERT_RE.search(message)
+    return m.group(1) if m else None
+
+
 def extract_ticket_refs(
     message: str,
     *,
@@ -154,6 +162,7 @@ def list_commits(
                     regex=ticket_regex,
                     default_project=default_project,
                 ),
+                reverts=_extract_reverted_sha(message),
             )
         )
     return out
@@ -168,3 +177,33 @@ def patch_equivalence_set(commits: list[Commit]) -> tuple[set[str], set[str]]:
     change_ids = {c.change_id for c in commits if c.change_id}
     patch_ids = {c.patch_id for c in commits if c.patch_id}
     return change_ids, patch_ids
+
+
+def _resolve_sha(ref: str, by_sha: dict[str, Commit]) -> str | None:
+    """Resolve a possibly-abbreviated sha to a full sha present in `by_sha`."""
+    if ref in by_sha:
+        return ref
+    matches = [s for s in by_sha if s.startswith(ref)]
+    return matches[0] if len(matches) == 1 else None
+
+
+def collapse_reverts(commits: list[Commit]) -> list[Commit]:
+    """Drop apply+revert pairs from a commit list.
+
+    A commit carrying the default `This reverts commit <sha>.` message cancels
+    the commit it names, when that commit is also in the list: both are removed,
+    so a change that was applied and then reverted counts as *not present*.
+
+    Revert-of-revert chains are best-effort only: the simple apply+revert case
+    is guaranteed; re-applying a change via a double revert is not un-cancelled.
+    """
+    by_sha = {c.sha: c for c in commits}
+    cancelled: set[str] = set()
+    for c in commits:
+        if c.reverts is None or c.sha in cancelled:
+            continue
+        target = _resolve_sha(c.reverts, by_sha)
+        if target is not None and target not in cancelled:
+            cancelled.add(c.sha)
+            cancelled.add(target)
+    return [c for c in commits if c.sha not in cancelled]
