@@ -1,5 +1,9 @@
 # mbmh
 
+[![CI](https://github.com/mrbald/mbmh/actions/workflows/ci.yml/badge.svg)](https://github.com/mrbald/mbmh/actions/workflows/ci.yml)
+[![License: AGPL-3.0-or-later](https://img.shields.io/badge/license-AGPL--3.0--or--later-blue.svg)](LICENSE)
+[![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](https://www.python.org/)
+
 > **[M]essy [b]ed — [m]essy [h]ead!**
 
 Hygiene checks for your engineering process: if you don't tidy up after
@@ -27,10 +31,11 @@ protocol, so GitLab is the first backend, not the only possible one.
 ## Install
 
 ```sh
-uv add mbmh      # or: pip install mbmh
+uv add "git+https://github.com/mrbald/mbmh"
+# or: pipx install "git+https://github.com/mrbald/mbmh"
 ```
 
-Requires Python ≥ 3.12 and `git` on the `PATH`.
+Requires Python ≥ 3.12 and `git` on the `PATH`. (A PyPI release will follow.)
 
 ## Use
 

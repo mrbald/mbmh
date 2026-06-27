@@ -11,7 +11,7 @@ All notable changes are recorded here. The format follows
   `In Progress` at commit time) and minimum-quality descriptions.
 - More trackers (GitHub Issues, Jira) behind the `IssueTrackerBackend` protocol.
 
-## [0.1.0] — unreleased
+## [0.1.0] — 2026-06-27
 
 ### Added
 - Release-branch scope validation against a GitLab milestone.
