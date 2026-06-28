@@ -6,6 +6,13 @@ All notable changes are recorded here. The format follows
 
 ## [Unreleased]
 
+### Planned
+- Ticket-structure rules: parent EPIC state (`Ready for Release` for done work,
+  `In Progress` at commit time) and minimum-quality descriptions.
+- More trackers (e.g. Jira) behind the `IssueTrackerBackend` protocol.
+
+## [0.2.0] — 2026-06-28
+
 ### Added
 - Local `todo.txt` backend (`--tracker local`): tickets in a plain text file in
   your repo, fully offline — no token, no network. Each task is a ticket
@@ -16,11 +23,6 @@ All notable changes are recorded here. The format follows
   (`--base-branch` / `--release-branch` kept as aliases).
 - Revert handling: an apply+revert pair (default `git revert` message) cancels
   out, so reverted work no longer counts as shipped.
-
-### Planned
-- Ticket-structure rules: parent EPIC state (`Ready for Release` for done work,
-  `In Progress` at commit time) and minimum-quality descriptions.
-- More trackers (e.g. Jira) behind the `IssueTrackerBackend` protocol.
 
 ## [0.1.0] — 2026-06-27
 
