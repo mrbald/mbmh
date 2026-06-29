@@ -248,6 +248,9 @@ class GitHubBackend:
             if isinstance(type_obj, dict)
             else ""
         )
+        # `parent` is intentionally unset: GitHub exposes sub-issue parents via
+        # the sub-issues API, not this payload. Wire it up by hand with an
+        # EpicResolver (see mbmh.validator.epics, README "Extending").
         return Ticket(
             ref=ref or TicketRef(project=self.issues_project, issue=number),
             title=str(raw.get("title", "")),

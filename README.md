@@ -180,13 +180,58 @@ fixtures/
 
 `mbmh` is meant to grow into a set of engineering-hygiene checks. Next up:
 
-- Native epic linking for the GitLab and GitHub backends.
+- Built-in epic linking for GitLab/GitHub (today it's DIY via `EpicResolver`).
 
-## Add a backend
+## Extending
 
-Implement `IssueTrackerBackend` (`mbmh.backend.protocol`) for GitHub, Jira,
-Linear, or any other tracker. The validator core, git operations, and report
-renderer don't change.
+### A new backend
+
+Implement `IssueTrackerBackend` (`mbmh.backend.protocol`) — `marker`,
+`fetch_milestone_tickets`, `fetch_ticket`, `close` — for Linear or any other
+tracker. The validator core, git operations, and report renderer don't change.
+
+### Epic resolution
+
+`--require-epic` needs each ticket's parent epic; how it's found per tracker:
+
+| Tracker | Epic linking |
+|---|---|
+| `local` | native — `parent:<id>` on the task |
+| `jira` | native — the issue's `parent` field |
+| `gitlab` | not in the issue payload — epic id is on `issue["epic"]["iid"]` (premium, group-level); the epic isn't an issue, so its state needs the group epics API |
+| `github` | not in the issue payload — parents come from the sub-issues API |
+
+For `local` and `jira` it just works. For `gitlab`/`github`, supply an
+`EpicResolver` (library use) — sketch for GitLab:
+
+```python
+import httpx
+from mbmh.models import Ticket, TicketRef
+from mbmh.validator import NoOpEpicResolver, validate
+
+class GitLabEpicResolver(NoOpEpicResolver):
+    """Skeleton: resolve a ticket's epic via GitLab's group epics API.
+    Adapt the epic lookup and field mapping to your instance."""
+
+    def __init__(self, base_url: str, token: str, group: str) -> None:
+        self.client = httpx.Client(base_url=base_url, headers={"PRIVATE-TOKEN": token})
+        self.group = group
+
+    def resolve(self, ticket: Ticket, backend) -> Ticket | None:
+        epic_iid = ...  # find the epic iid for `ticket` (your logic)
+        if epic_iid is None:
+            return None
+        raw = self.client.get(f"/api/v4/groups/{self.group}/epics/{epic_iid}").json()
+        return Ticket(
+            ref=TicketRef(project=ticket.ref.project, issue=int(raw["iid"])),
+            title=str(raw.get("title", "")),
+            state_ready="Ready for Release" in raw.get("labels", []),
+            web_url=str(raw.get("web_url", "")),
+            kind="epic",
+        )
+
+validate(config, backend, epic_resolver=GitLabEpicResolver(...))
+```
 
 ## License
 

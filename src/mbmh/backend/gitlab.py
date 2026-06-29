@@ -202,6 +202,10 @@ class GitLabBackend:
         labels = raw.get("labels", [])
         ready = self.ready_label in labels
         web_url = str(raw.get("web_url", ""))
+        # `parent` is intentionally unset: GitLab puts the epic id on
+        # raw["epic"]["iid"] (premium, group-level), and the epic isn't an issue
+        # — resolving its state needs the group epics API. Wire it up by hand
+        # with an EpicResolver (see mbmh.validator.epics, README "Extending").
         return Ticket(
             ref=ref or TicketRef(project=str(project), issue=iid),
             title=str(raw.get("title", "")),
