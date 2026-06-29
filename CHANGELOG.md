@@ -7,6 +7,10 @@ All notable changes are recorded here. The format follows
 ## [Unreleased]
 
 ### Added
+- Jira backend (`--tracker jira`, Basic auth) in live and fixture modes:
+  fixVersion as milestone, status name as the ready state, native epics for
+  `--require-epic`. Commit refs are Jira keys (`PROJ-123`) — pass a matching
+  `--ticket-regex`.
 - Ticket-structure rules (opt-in): `--check-descriptions` flags milestone
   tickets with thin or missing descriptions; `--require-epic` requires each
   milestone ticket to roll up to a parent epic that is Ready for Release. Fully
@@ -14,7 +18,7 @@ All notable changes are recorded here. The format follows
   checks work on all backends.
 
 ### Planned
-- More trackers (e.g. Jira) behind the `IssueTrackerBackend` protocol.
+- Native epic linking for the GitLab and GitHub backends.
 
 ## [0.2.0] — 2026-06-28
 

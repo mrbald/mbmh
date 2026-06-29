@@ -29,8 +29,8 @@ of a planned family of process-hygiene checks.
 | `epic-not-ready` | error | a ticket's parent epic is not Ready for Release (opt-in) |
 
 The validator core is **vendor-free** — it talks to an `IssueTrackerBackend`
-protocol. **GitLab**, **GitHub**, and a local **`todo.txt`** are supported
-today; more can be added.
+protocol. **GitLab**, **GitHub**, **Jira**, and a local **`todo.txt`** are
+supported today; more can be added.
 
 ## Install
 
@@ -89,6 +89,25 @@ mbmh \
   --milestone 1.4.0 \
   --issues-project myorg/myrepo
 ```
+
+### Jira
+
+`--tracker jira` with Basic auth (email + API token). The milestone maps to a
+**fixVersion** and the ready state to a **status** name:
+
+```sh
+export JIRA_BASE_URL=https://your-site.atlassian.net
+export JIRA_EMAIL=you@example.com
+export JIRA_API_TOKEN=xxxxxxxx
+mbmh --tracker jira \
+  --repo . --to v1.4.0 --from v1.3.0 \
+  --milestone 1.4.0 --issues-project PROJ \
+  --ready-label "Ready for Release" \
+  --ticket-regex '(?P<project>[A-Z][A-Z0-9]+)-(?P<issue>\d+)'
+```
+
+Commits reference Jira keys like `PROJ-123`, so the `--ticket-regex` above is
+required. Epics are native, so `--require-epic` works directly.
 
 ### Local (todo.txt)
 
@@ -159,7 +178,7 @@ fixtures/
 
 `mbmh` is meant to grow into a set of engineering-hygiene checks. Next up:
 
-- More trackers (e.g. Jira) behind the same `IssueTrackerBackend`.
+- Native epic linking for the GitLab and GitHub backends.
 
 ## Add a backend
 

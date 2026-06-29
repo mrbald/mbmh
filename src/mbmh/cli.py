@@ -21,6 +21,7 @@ import typer
 from mbmh.backend import IssueTrackerBackend
 from mbmh.backend.github import GitHubBackend
 from mbmh.backend.gitlab import GitLabBackend
+from mbmh.backend.jira import JiraBackend
 from mbmh.backend.local import LocalBackend
 from mbmh.config import (
     DEFAULT_READY_LABEL,
@@ -39,6 +40,7 @@ app = typer.Typer(
 class Tracker(StrEnum):
     gitlab = "gitlab"
     github = "github"
+    jira = "jira"
     local = "local"
 
 
@@ -57,6 +59,27 @@ def _resolve_backend(
             typer.echo(f"todo file not found: {path}", err=True)
             raise typer.Exit(code=2)
         return LocalBackend.from_file(path, issues_project=issues_project, ready_label=ready_label)
+    if tracker is Tracker.jira:
+        if fixture_dir is not None:
+            return JiraBackend.from_fixture_dir(
+                fixture_dir, issues_project=issues_project, ready_label=ready_label
+            )
+        email = os.environ.get("JIRA_EMAIL")
+        token = os.environ.get("JIRA_API_TOKEN")
+        base_url = os.environ.get("JIRA_BASE_URL")
+        if not (email and token and base_url):
+            typer.echo(
+                "set JIRA_EMAIL, JIRA_API_TOKEN, and JIRA_BASE_URL (or use --fixture-dir).",
+                err=True,
+            )
+            raise typer.Exit(code=2)
+        return JiraBackend.from_token(
+            base_url=base_url,
+            email=email,
+            token=token,
+            issues_project=issues_project,
+            ready_label=ready_label,
+        )
     if tracker is Tracker.github:
         if fixture_dir is not None:
             return GitHubBackend.from_fixture_dir(
