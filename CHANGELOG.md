@@ -6,6 +6,11 @@ All notable changes are recorded here. The format follows
 
 ## [Unreleased]
 
+### Planned
+- Native epic linking for the GitLab and GitHub backends.
+
+## [0.3.0] — 2026-06-29
+
 ### Added
 - Pluggable epic resolution (library): `validate(..., epic_resolver=...)` takes a
   custom `EpicResolver` for trackers mbmh doesn't link epics for natively (e.g.
@@ -20,9 +25,6 @@ All notable changes are recorded here. The format follows
   milestone ticket to roll up to a parent epic that is Ready for Release. Fully
   wired for the local `todo.txt` backend (`type:` / `parent:`); description
   checks work on all backends.
-
-### Planned
-- Native epic linking for the GitLab and GitHub backends.
 
 ## [0.2.0] — 2026-06-28
 
