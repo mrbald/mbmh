@@ -74,6 +74,11 @@ def validate(
         )
         _check_regressions(result, current_commits, previous_commits)
 
+    if config.check_descriptions:
+        _check_descriptions(result, milestone_tickets, config)
+    if config.require_epic:
+        _check_epics(result, milestone_tickets, backend, config)
+
     return result
 
 
@@ -220,5 +225,83 @@ def _check_regressions(
                     ),
                     commit_sha=c.sha,
                     detail=c.subject,
+                )
+            )
+
+
+def _check_descriptions(
+    result: ValidationResult,
+    tickets: list[Ticket],
+    config: ValidatorConfig,
+) -> None:
+    """Flag milestone tickets whose description is missing or too thin.
+
+    A length/non-emptiness heuristic — not a grammar check (that would need an
+    external engine). Tune the threshold with `min_description_words`.
+    """
+    for t in tickets:
+        words = len(t.description.split())
+        if words < config.min_description_words:
+            result.findings.append(
+                Finding(
+                    category=ErrorCategory.POOR_DESCRIPTION,
+                    message=f"milestone ticket {t.ref} has a thin or missing description",
+                    ticket=t.ref,
+                    detail=f"{words} word(s); minimum {config.min_description_words}",
+                )
+            )
+
+
+def _check_epics(
+    result: ValidationResult,
+    tickets: list[Ticket],
+    backend: IssueTrackerBackend,
+    config: ValidatorConfig,
+) -> None:
+    """Each milestone ticket must roll up to a parent epic that is ready.
+
+    The parent is fetched via the backend; it must be of kind `epic_kind` and
+    in the ready-for-release state. (Checks the "done" half of the rule — the
+    "In Progress at commit time" half needs per-commit state history we lack.)
+    """
+    for t in tickets:
+        if config.epic_kind and t.kind.lower() == config.epic_kind.lower():
+            continue  # an epic is a parent; it isn't required to have its own epic
+        if t.parent is None:
+            result.findings.append(
+                Finding(
+                    category=ErrorCategory.MISSING_EPIC,
+                    message=f"milestone ticket {t.ref} has no parent epic",
+                    ticket=t.ref,
+                )
+            )
+            continue
+        epic = backend.fetch_ticket(t.parent)
+        is_epic = epic is not None and (
+            not config.epic_kind or epic.kind.lower() == config.epic_kind.lower()
+        )
+        if not is_epic:
+            detail = (
+                "parent not found"
+                if epic is None
+                else f"parent kind: {epic.kind or '(unspecified)'}"
+            )
+            result.findings.append(
+                Finding(
+                    category=ErrorCategory.MISSING_EPIC,
+                    message=f"milestone ticket {t.ref} parent {t.parent} is not an epic",
+                    ticket=t.ref,
+                    detail=detail,
+                )
+            )
+            continue
+        assert epic is not None
+        if not epic.state_ready:
+            result.findings.append(
+                Finding(
+                    category=ErrorCategory.EPIC_NOT_READY,
+                    message=f"epic {t.parent} for ticket {t.ref} is not Ready for Release",
+                    ticket=t.ref,
+                    detail=epic.title,
                 )
             )

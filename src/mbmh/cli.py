@@ -128,6 +128,27 @@ def run(
             help="Include merge commits in per-commit checks.",
         ),
     ] = False,
+    check_descriptions: Annotated[
+        bool,
+        typer.Option(
+            "--check-descriptions/--no-check-descriptions",
+            help="Flag milestone tickets with thin or missing descriptions.",
+        ),
+    ] = False,
+    min_description_words: Annotated[
+        int,
+        typer.Option(help="Minimum words for a description (with --check-descriptions)."),
+    ] = 5,
+    require_epic: Annotated[
+        bool,
+        typer.Option(
+            "--require-epic/--no-require-epic",
+            help="Require each milestone ticket to have a parent epic that is ready.",
+        ),
+    ] = False,
+    epic_kind: Annotated[
+        str, typer.Option(help="Ticket kind that identifies an epic (with --require-epic).")
+    ] = "epic",
     fixture_dir: Annotated[
         Path | None, typer.Option(help="Use recorded JSON fixtures from this directory.")
     ] = None,
@@ -157,6 +178,10 @@ def run(
         ticket_regex=ticket_regex,
         ready_label=ready_label,
         include_merges=include_merges,
+        check_descriptions=check_descriptions,
+        min_description_words=min_description_words,
+        require_epic=require_epic,
+        epic_kind=epic_kind,
     )
 
     backend = _resolve_backend(tracker, fixture_dir, issues_project, ready_label, repo, todo_file)

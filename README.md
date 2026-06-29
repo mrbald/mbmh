@@ -24,6 +24,9 @@ of a planned family of process-hygiene checks.
 | `dropped` | error | a previous-release commit has no patch-equivalent on this branch |
 | `orphan` | error | a commit has no parseable ticket reference |
 | `ambiguous-equivalence` | warning | a previous-branch commit has no fingerprint to match on |
+| `poor-description` | warning | a milestone ticket's description is thin or missing (opt-in) |
+| `missing-epic` | error | a milestone ticket has no parent epic (opt-in) |
+| `epic-not-ready` | error | a ticket's parent epic is not Ready for Release (opt-in) |
 
 The validator core is **vendor-free** — it talks to an `IssueTrackerBackend`
 protocol. **GitLab**, **GitHub**, and a local **`todo.txt`** are supported
@@ -116,6 +119,29 @@ commits are matched by `patch-id` / `Change-Id`, and an apply-then-revert pair
 (default `git revert` message) cancels out. `--from` defaults to `main`; the old
 `--base-branch` / `--release-branch` names still work.
 
+### Ticket-structure rules (opt-in)
+
+Two extra checks, off by default:
+
+- `--check-descriptions` (with `--min-description-words N`, default 5) flags
+  milestone tickets whose description is missing or too short. A length
+  heuristic, not a grammar engine.
+- `--require-epic` (with `--epic-kind`, default `epic`) requires each milestone
+  ticket to roll up to a parent epic that is *Ready for Release*.
+
+The epic rule is fully wired for the local `todo.txt` backend — mark the epic
+`type:epic` and point children at it with `parent:<id>`:
+
+```text
+Build the auth subsystem end to end id:100 type:epic @ready
+Implement the login form fully id:42 milestone:1.4.0 parent:100 @ready
+```
+
+GitLab and GitHub populate descriptions (and best-effort issue type); native
+epic linking for them is a later step. Only the *Ready-for-Release* half of the
+rule is checked — "In Progress at commit time" would need per-commit state
+history.
+
 ## Fixture layout
 
 Fixtures mirror the GitLab REST JSON shape:
@@ -133,8 +159,6 @@ fixtures/
 
 `mbmh` is meant to grow into a set of engineering-hygiene checks. Next up:
 
-- Ticket-structure rules: parent **EPIC** state (`Ready for Release` for done
-  work, `In Progress` at commit time) and minimum-quality descriptions.
 - More trackers (e.g. Jira) behind the same `IssueTrackerBackend`.
 
 ## Add a backend

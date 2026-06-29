@@ -6,9 +6,14 @@ All notable changes are recorded here. The format follows
 
 ## [Unreleased]
 
+### Added
+- Ticket-structure rules (opt-in): `--check-descriptions` flags milestone
+  tickets with thin or missing descriptions; `--require-epic` requires each
+  milestone ticket to roll up to a parent epic that is Ready for Release. Fully
+  wired for the local `todo.txt` backend (`type:` / `parent:`); description
+  checks work on all backends.
+
 ### Planned
-- Ticket-structure rules: parent EPIC state (`Ready for Release` for done work,
-  `In Progress` at commit time) and minimum-quality descriptions.
 - More trackers (e.g. Jira) behind the `IssueTrackerBackend` protocol.
 
 ## [0.2.0] — 2026-06-28

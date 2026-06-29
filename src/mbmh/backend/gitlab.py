@@ -207,4 +207,6 @@ class GitLabBackend:
             title=str(raw.get("title", "")),
             state_ready=ready,
             web_url=web_url,
+            description=str(raw.get("description") or ""),
+            kind=str(raw.get("issue_type") or ""),
         )

@@ -29,6 +29,9 @@ class Ticket:
     title: str
     state_ready: bool
     web_url: str
+    description: str = ""
+    kind: str = ""  # issue type, e.g. "epic", "story"
+    parent: TicketRef | None = None  # parent epic/ticket, when the tracker links it
 
 
 @dataclass(frozen=True)
@@ -54,6 +57,9 @@ class ErrorCategory(StrEnum):
     DROPPED = "dropped"
     ORPHAN = "orphan"
     AMBIGUOUS_EQUIVALENCE = "ambiguous-equivalence"
+    POOR_DESCRIPTION = "poor-description"
+    MISSING_EPIC = "missing-epic"
+    EPIC_NOT_READY = "epic-not-ready"
 
 
 class Severity(StrEnum):
@@ -68,6 +74,9 @@ CATEGORY_SEVERITY: dict[ErrorCategory, Severity] = {
     ErrorCategory.DROPPED: Severity.ERROR,
     ErrorCategory.ORPHAN: Severity.ERROR,
     ErrorCategory.AMBIGUOUS_EQUIVALENCE: Severity.WARNING,
+    ErrorCategory.POOR_DESCRIPTION: Severity.WARNING,
+    ErrorCategory.MISSING_EPIC: Severity.ERROR,
+    ErrorCategory.EPIC_NOT_READY: Severity.ERROR,
 }
 
 

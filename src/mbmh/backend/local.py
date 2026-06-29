@@ -18,6 +18,7 @@ from the title. There is no web URL, so the report shows a bare ticket ref.
 
 from __future__ import annotations
 
+import contextlib
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -36,6 +37,8 @@ class _Task:
     milestone: str | None
     title: str
     ready: bool
+    kind: str = ""
+    parent: int | None = None
 
 
 def _parse_line(line: str, *, ready_token: str) -> _Task | None:
@@ -57,6 +60,8 @@ def _parse_line(line: str, *, ready_token: str) -> _Task | None:
 
     number: int | None = None
     milestone: str | None = None
+    kind: str = ""
+    parent: int | None = None
     contexts: set[str] = set()
     title_words: list[str] = []
     for tok in tokens[i:]:
@@ -70,6 +75,11 @@ def _parse_line(line: str, *, ready_token: str) -> _Task | None:
                     title_words.append(tok)
             elif key == "milestone":
                 milestone = value
+            elif key == "type":
+                kind = value.lower()
+            elif key == "parent":
+                with contextlib.suppress(ValueError):
+                    parent = int(value)
             # other key:value metadata is dropped from the title
             continue
         if len(tok) > 1 and tok[0] == "@":
@@ -84,6 +94,8 @@ def _parse_line(line: str, *, ready_token: str) -> _Task | None:
         milestone=milestone,
         title=" ".join(title_words),
         ready=ready_token in contexts,
+        kind=kind,
+        parent=parent,
     )
 
 
@@ -136,9 +148,17 @@ class LocalBackend:
 
     def _to_ticket(self, task: _Task) -> Ticket:
         assert task.number is not None
+        parent = (
+            TicketRef(project=self.issues_project, issue=task.parent)
+            if task.parent is not None
+            else None
+        )
         return Ticket(
             ref=TicketRef(project=self.issues_project, issue=task.number),
             title=task.title,
             state_ready=task.ready,
             web_url="",
+            description=task.title,
+            kind=task.kind,
+            parent=parent,
         )

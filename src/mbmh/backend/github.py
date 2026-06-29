@@ -242,9 +242,17 @@ class GitHubBackend:
     def _to_ticket(self, raw: dict[str, Any], *, ref: TicketRef | None = None) -> Ticket:
         number = int(raw["number"])
         ready = self.ready_label in _label_names(raw)
+        type_obj = raw.get("type")
+        kind = (
+            str(cast("dict[str, Any]", type_obj).get("name", ""))
+            if isinstance(type_obj, dict)
+            else ""
+        )
         return Ticket(
             ref=ref or TicketRef(project=self.issues_project, issue=number),
             title=str(raw.get("title", "")),
             state_ready=ready,
             web_url=str(raw.get("html_url", "")),
+            description=str(raw.get("body") or ""),
+            kind=kind,
         )
