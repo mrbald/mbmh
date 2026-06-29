@@ -28,6 +28,8 @@ of a planned family of process-hygiene checks.
 | `missing-epic` | error | a milestone ticket has no parent epic (opt-in) |
 | `epic-not-ready` | error | a ticket's parent epic is not Ready for Release (opt-in) |
 
+See **[docs/CHECKS.md](docs/CHECKS.md)** for exactly how each check works and when it fires.
+
 The validator core is **vendor-free** — it talks to an `IssueTrackerBackend`
 protocol. **GitLab**, **GitHub**, **Jira**, and a local **`todo.txt`** are
 supported today; more can be added.
