@@ -7,6 +7,10 @@ All notable changes are recorded here. The format follows
 ## [Unreleased]
 
 ### Added
+- Pluggable epic resolution (library): `validate(..., epic_resolver=...)` takes a
+  custom `EpicResolver` for trackers mbmh doesn't link epics for natively (e.g.
+  GitLab/GitHub). Ships `DefaultEpicResolver` (uses `Ticket.parent`) and a
+  `NoOpEpicResolver` stub; the CLI uses the default.
 - Jira backend (`--tracker jira`, Basic auth) in live and fixture modes:
   fixVersion as milestone, status name as the ready state, native epics for
   `--require-epic`. Commit refs are Jira keys (`PROJ-123`) — pass a matching

@@ -156,10 +156,12 @@ Build the auth subsystem end to end id:100 type:epic @ready
 Implement the login form fully id:42 milestone:1.4.0 parent:100 @ready
 ```
 
-GitLab and GitHub populate descriptions (and best-effort issue type); native
-epic linking for them is a later step. Only the *Ready-for-Release* half of the
-rule is checked — "In Progress at commit time" would need per-commit state
-history.
+GitLab and GitHub populate descriptions (and best-effort issue type), but don't
+expose epic links to mbmh. As a library, plug in your own: implement
+`EpicResolver` (or subclass `NoOpEpicResolver`) and pass it to
+`validate(..., epic_resolver=...)`. The CLI uses `DefaultEpicResolver`, which
+reads `Ticket.parent`. Only the *Ready-for-Release* half of the rule is checked
+— "In Progress at commit time" would need per-commit state history.
 
 ## Fixture layout
 

@@ -3,5 +3,15 @@
 from __future__ import annotations
 
 from mbmh.validator.core import validate
+from mbmh.validator.epics import (
+    DefaultEpicResolver,
+    EpicResolver,
+    NoOpEpicResolver,
+)
 
-__all__ = ["validate"]
+__all__ = [
+    "DefaultEpicResolver",
+    "EpicResolver",
+    "NoOpEpicResolver",
+    "validate",
+]
