@@ -28,12 +28,13 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from urllib.parse import quote
 
 import httpx
 
 from mbmh.backend._http import paginate
+from mbmh.backend.protocol import IssueTrackerBackend
 from mbmh.config import DEFAULT_READY_LABEL
 from mbmh.models import Ticket, TicketRef
 
@@ -202,10 +203,9 @@ class GitLabBackend:
         labels = raw.get("labels", [])
         ready = self.ready_label in labels
         web_url = str(raw.get("web_url", ""))
-        # `parent` is intentionally unset: GitLab puts the epic id on
-        # raw["epic"]["iid"] (premium, group-level), and the epic isn't an issue
-        # — resolving its state needs the group epics API. Wire it up by hand
-        # with an EpicResolver (see mbmh.validator.epics, README "Extending").
+        # `parent` is left unset: GitLab epics are premium/group-level and aren't
+        # issues. GitLabEpicResolver (below) fetches the epic via the group epics
+        # API; the CLI wires it in for --require-epic.
         return Ticket(
             ref=ref or TicketRef(project=str(project), issue=iid),
             title=str(raw.get("title", "")),
@@ -214,3 +214,63 @@ class GitLabBackend:
             description=str(raw.get("description") or ""),
             kind=str(raw.get("issue_type") or ""),
         )
+
+
+@dataclass
+class GitLabEpicResolver:
+    """Best-effort epic resolution for GitLab (premium, group-level epics).
+
+    Reads the issue's `epic` (iid + group_id), fetches the epic from the group
+    epics API, and maps its labels to the ready state. Unverified against a live
+    instance — confirm on yours. The CLI uses it for live GitLab + --require-epic.
+    """
+
+    _client: httpx.Client
+    ready_label: str = DEFAULT_READY_LABEL
+
+    @classmethod
+    def from_token(
+        cls,
+        *,
+        base_url: str,
+        token: str,
+        ready_label: str = DEFAULT_READY_LABEL,
+        client: httpx.Client | None = None,
+    ) -> GitLabEpicResolver:
+        http = client or httpx.Client(
+            base_url=base_url.rstrip("/"),
+            headers={"PRIVATE-TOKEN": token, "Accept": "application/json"},
+            timeout=httpx.Timeout(30.0),
+        )
+        return cls(_client=http, ready_label=ready_label)
+
+    def resolve(self, ticket: Ticket, backend: IssueTrackerBackend) -> Ticket | None:
+        enc = quote(ticket.ref.project, safe="")
+        issue = self._client.get(f"/api/v4/projects/{enc}/issues/{ticket.ref.issue}")
+        if issue.status_code == 404:
+            return None
+        issue.raise_for_status()
+        epic = issue.json().get("epic")
+        if not isinstance(epic, dict):
+            return None
+        epic_obj = cast("dict[str, Any]", epic)
+        group_id = epic_obj.get("group_id")
+        epic_iid = epic_obj.get("iid")
+        if group_id is None or epic_iid is None:
+            return None
+        resp = self._client.get(f"/api/v4/groups/{group_id}/epics/{epic_iid}")
+        if resp.status_code == 404:
+            return None
+        resp.raise_for_status()
+        raw: dict[str, Any] = resp.json()
+        labels = raw.get("labels", [])
+        return Ticket(
+            ref=TicketRef(project=ticket.ref.project, issue=int(epic_iid)),
+            title=str(raw.get("title", "")),
+            state_ready=self.ready_label in labels,
+            web_url=str(raw.get("web_url", "")),
+            kind="epic",
+        )
+
+    def close(self) -> None:
+        self._client.close()

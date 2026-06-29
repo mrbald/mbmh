@@ -6,8 +6,10 @@ All notable changes are recorded here. The format follows
 
 ## [Unreleased]
 
-### Planned
-- Native epic linking for the GitLab and GitHub backends.
+### Added
+- Built-in epic linking for GitLab and GitHub: GitHub maps the sub-issue
+  `parent` natively; live GitLab uses a shipped best-effort `GitLabEpicResolver`
+  (group epics API), wired into the CLI for `--require-epic`.
 
 ## [0.3.0] — 2026-06-29
 

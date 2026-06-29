@@ -60,6 +60,24 @@ def _label_names(raw: dict[str, Any]) -> list[str]:
     return names
 
 
+def _parent_ref(raw: dict[str, Any], default_project: str) -> TicketRef | None:
+    """Read the sub-issue `parent` from an issue payload, when GitHub provides it."""
+    parent = raw.get("parent")
+    if not isinstance(parent, dict):
+        return None
+    p = cast("dict[str, Any]", parent)
+    number = p.get("number")
+    if not isinstance(number, int):
+        return None
+    project = default_project
+    repo = p.get("repository")
+    if isinstance(repo, dict):
+        full = cast("dict[str, Any]", repo).get("full_name")
+        if isinstance(full, str):
+            project = full
+    return TicketRef(project=project, issue=number)
+
+
 @dataclass
 class GitHubBackend:
     """GitHub Issues issue-tracker backend.
@@ -248,9 +266,9 @@ class GitHubBackend:
             if isinstance(type_obj, dict)
             else ""
         )
-        # `parent` is intentionally unset: GitHub exposes sub-issue parents via
-        # the sub-issues API, not this payload. Wire it up by hand with an
-        # EpicResolver (see mbmh.validator.epics, README "Extending").
+        # `parent` is read from the sub-issue parent when GitHub returns it on
+        # the payload; otherwise it stays None. Its parent is itself an issue, so
+        # the default EpicResolver fetches it like any other ticket.
         return Ticket(
             ref=ref or TicketRef(project=self.issues_project, issue=number),
             title=str(raw.get("title", "")),
@@ -258,4 +276,5 @@ class GitHubBackend:
             web_url=str(raw.get("html_url", "")),
             description=str(raw.get("body") or ""),
             kind=kind,
+            parent=_parent_ref(raw, self.issues_project),
         )

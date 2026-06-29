@@ -20,7 +20,7 @@ import typer
 
 from mbmh.backend import IssueTrackerBackend
 from mbmh.backend.github import GitHubBackend
-from mbmh.backend.gitlab import GitLabBackend
+from mbmh.backend.gitlab import GitLabBackend, GitLabEpicResolver
 from mbmh.backend.jira import JiraBackend
 from mbmh.backend.local import LocalBackend
 from mbmh.config import (
@@ -29,7 +29,7 @@ from mbmh.config import (
     ValidatorConfig,
 )
 from mbmh.report import render_report
-from mbmh.validator import validate
+from mbmh.validator import EpicResolver, validate
 
 app = typer.Typer(
     help="Validate the scope of a release against its milestone.",
@@ -105,6 +105,21 @@ def _resolve_backend(
     return GitLabBackend.from_token(
         base_url=base_url, token=token, issues_project=issues_project, ready_label=ready_label
     )
+
+
+def _resolve_epic_resolver(
+    tracker: Tracker, fixture_dir: Path | None, ready_label: str
+) -> EpicResolver | None:
+    """A built-in resolver for live GitLab (its epics aren't issues). Other
+    trackers use the default `Ticket.parent` path (GitHub/Jira/local)."""
+    if tracker is Tracker.gitlab and fixture_dir is None:
+        token = os.environ.get("GITLAB_API_TOKEN")
+        if token:
+            base_url = os.environ.get("GITLAB_BASE_URL", "https://gitlab.com")
+            return GitLabEpicResolver.from_token(
+                base_url=base_url, token=token, ready_label=ready_label
+            )
+    return None
 
 
 @app.command()
@@ -208,9 +223,12 @@ def run(
     )
 
     backend = _resolve_backend(tracker, fixture_dir, issues_project, ready_label, repo, todo_file)
+    epic_resolver = (
+        _resolve_epic_resolver(tracker, fixture_dir, ready_label) if require_epic else None
+    )
 
     try:
-        result = validate(config, backend)
+        result = validate(config, backend, epic_resolver=epic_resolver)
     finally:
         backend.close()
     report = render_report(result)

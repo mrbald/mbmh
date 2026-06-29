@@ -198,39 +198,24 @@ tracker. The validator core, git operations, and report renderer don't change.
 |---|---|
 | `local` | native — `parent:<id>` on the task |
 | `jira` | native — the issue's `parent` field |
-| `gitlab` | not in the issue payload — epic id is on `issue["epic"]["iid"]` (premium, group-level); the epic isn't an issue, so its state needs the group epics API |
-| `github` | not in the issue payload — parents come from the sub-issues API |
+| `github` | native — the sub-issue `parent` on the issue payload, when present |
+| `gitlab` | built-in `GitLabEpicResolver` (best-effort) — fetches the epic via the group epics API; the CLI wires it in for `--require-epic`. Premium/group-level — verify on your instance |
 
-For `local` and `jira` it just works. For `gitlab`/`github`, supply an
-`EpicResolver` (library use) — sketch for GitLab:
+`local`, `jira`, and `github` resolve epics with no extra setup; live `gitlab`
+uses the shipped `GitLabEpicResolver` when you run `--require-epic`. To support
+another tracker — or override any of the above — implement `EpicResolver` and
+pass it to `validate(..., epic_resolver=...)`:
 
 ```python
-import httpx
 from mbmh.models import Ticket, TicketRef
 from mbmh.validator import NoOpEpicResolver, validate
 
-class GitLabEpicResolver(NoOpEpicResolver):
-    """Skeleton: resolve a ticket's epic via GitLab's group epics API.
-    Adapt the epic lookup and field mapping to your instance."""
-
-    def __init__(self, base_url: str, token: str, group: str) -> None:
-        self.client = httpx.Client(base_url=base_url, headers={"PRIVATE-TOKEN": token})
-        self.group = group
-
+class MyEpicResolver(NoOpEpicResolver):
     def resolve(self, ticket: Ticket, backend) -> Ticket | None:
-        epic_iid = ...  # find the epic iid for `ticket` (your logic)
-        if epic_iid is None:
-            return None
-        raw = self.client.get(f"/api/v4/groups/{self.group}/epics/{epic_iid}").json()
-        return Ticket(
-            ref=TicketRef(project=ticket.ref.project, issue=int(raw["iid"])),
-            title=str(raw.get("title", "")),
-            state_ready="Ready for Release" in raw.get("labels", []),
-            web_url=str(raw.get("web_url", "")),
-            kind="epic",
-        )
+        epic_ref: TicketRef | None = ...  # find the epic for `ticket`, your way
+        return backend.fetch_ticket(epic_ref) if epic_ref else None
 
-validate(config, backend, epic_resolver=GitLabEpicResolver(...))
+validate(config, backend, epic_resolver=MyEpicResolver())
 ```
 
 ## License
